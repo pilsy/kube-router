@@ -1,0 +1,9 @@
+description: A distributed load balancer, firewall and router designed for Kubernetes
+engine: gotpl
+maintainers:
+- email: richard.gustin86@gmail.com
+  name: Richard Gustin
+name: kube-router
+sources:
+- https://github.com/cloudnativelabs/kube-router
+version: 0.1.1

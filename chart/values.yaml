@@ -1,0 +1,53 @@
+rbac:
+  install: true
+  apiVersion: v1beta1
+
+image:
+  tag: v0.0.18
+  name: cloudnativelabs/kube-router
+  pullPolicy: IfNotPresent
+
+daemonset:
+  enabled: true
+  run:
+    proxy: true
+    router: true
+    firewall: true
+
+  advertise:
+    clusterIP: true
+    externalIP: true
+
+  options:
+    hairpinMode: true
+    nodesFullMesh: true
+    enableOverlay: false
+    masqueradeAll: false
+    enablePodEgress: false
+    nodePortBindonAllIp: true
+
+  cluster:
+    asn: 65200
+    cidr: 10.248.160.0/19
+    peerRouter:
+      ips: 10.246.75.253
+      asns: 65200
+
+  syncPeriod:
+    ipvs: "2m"
+    routes: "2m"
+    config: "2m"
+    iptables: "2m"
+
+configMap:
+  cni-conf.json: |
+    {
+      "name":"kubernetes",
+      "type":"bridge",
+      "bridge":"kube-bridge",
+      "isDefaultGateway":true,
+      "hairpinMode": true,
+      "ipam": {
+        "type":"host-local"
+      }
+    }

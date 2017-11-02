@@ -55,8 +55,12 @@ spec:
             - '--cluster-asn={{ .Values.daemonset.cluster.asn }}'
             {{ end -}}
             - '--cluster-cidr={{ .Values.daemonset.cluster.cidr }}'
+            {{- if .Values.daemonset.cluster.peerRouter.ips }}
             - '--peer-router-ips={{ .Values.daemonset.cluster.peerRouter.ips }}'
+            {{ end -}}
+            {{- if .Values.daemonset.cluster.peerRouter.asns }}
             - '--peer-router-asns={{ .Values.daemonset.cluster.peerRouter.asns }}'
+            {{ end -}}
             - '--ipvs-sync-period={{ .Values.daemonset.syncPeriod.ipvs }}'
             - '--routes-sync-period={{ .Values.daemonset.syncPeriod.routes }}'
             - '--config-sync-period={{ .Values.daemonset.syncPeriod.config }}'

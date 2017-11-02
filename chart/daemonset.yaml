@@ -1,0 +1,127 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-router
+  namespace: kube-system
+  labels:
+    k8s-app: kube-router
+    tier: node
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-router
+      tier: node
+  template:
+    metadata:
+      annotations:
+        checkpointer.alpha.coreos.com/checkpoint: "true"
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        k8s-app: kube-router
+        tier: node
+        app: {{ include "name" . | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        release: {{ .Release.Name | quote }}
+        heritage: {{ .Release.Service | quote }}
+    spec:
+      containers:
+        - name: kube-router
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: "{{ .Values.image.name }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - '--kubeconfig=/etc/kubernetes/kubeconfig'
+            - '--run-router={{ .Values.daemonset.run.router }}'
+            - '--run-firewall={{ .Values.daemonset.run.firewall }}'
+            - '--run-service-proxy={{ .Values.daemonset.run.proxy }}'
+            - '--masquerade-all={{ .Values.daemonset.options.masqueradeAll }}'
+            - '--enable-overlay={{ .Values.daemonset.options.enableOverlay }}'
+            - '--enable-pod-egress={{ .Values.daemonset.options.enablePodEgress }}'
+            - '--hairpin-mode={{ .Values.daemonset.options.hairpinMode }}'
+            - '--nodeport-bindon-all-ip={{ .Values.daemonset.options.nodePortBindonAllIp }}'
+            - '--nodes-full-mesh={{ .Values.daemonset.options.nodesFullMesh }}'
+            {{ if .Values.daemonset.advertise.clusterIP -}}
+            - '--advertise-cluster-ip'
+            {{- end }}
+            {{ if .Values.daemonset.advertise.externalIP -}}
+            - '--advertise-external-ip'
+            {{- end }}
+            {{- if .Values.daemonset.cluster.asn }}
+            - '--cluster-asn={{ .Values.daemonset.cluster.asn }}'
+            {{ end -}}
+            - '--cluster-cidr={{ .Values.daemonset.cluster.cidr }}'
+            - '--peer-router-ips={{ .Values.daemonset.cluster.peerRouter.ips }}'
+            - '--peer-router-asns={{ .Values.daemonset.cluster.peerRouter.asns }}'
+            - '--ipvs-sync-period={{ .Values.daemonset.syncPeriod.ipvs }}'
+            - '--routes-sync-period={{ .Values.daemonset.syncPeriod.routes }}'
+            - '--config-sync-period={{ .Values.daemonset.syncPeriod.config }}'
+            - '--iptables-sync-period={{ .Values.daemonset.syncPeriod.iptables }}'
+          resources:
+            requests:
+              cpu: 250m
+              memory: 250Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: cni-conf-dir
+              mountPath: /etc/cni/net.d
+            - name: kubeconfig
+              mountPath: /etc/kubernetes/kubeconfig
+              readOnly: true
+        - name: install-cni
+          image: busybox
+          command:
+            - /bin/sh
+            - -c
+            - set -e -x;
+              if [ ! -f /etc/cni/net.d/10-kuberouter.conf ]; then
+                TMP=/etc/cni/net.d/.tmp-kuberouter-cfg;
+                cp /etc/kube-router/cni-conf.json ${TMP};
+                mv ${TMP} /etc/cni/net.d/10-kuberouter.conf;
+              fi
+              sleep 3600;
+          volumeMounts:
+            - name: cni-conf-dir
+              mountPath: /etc/cni/net.d
+            - name: kube-router-cfg
+              mountPath: /etc/kube-router
+          imagePullPolicy: IfNotPresent
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      restartPolicy: Always
+      {{- if .Values.rbac.install }}
+      serviceAccount: kube-router
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+      volumes:
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: cni-conf-dir
+          hostPath:
+            path: /etc/kubernetes/cni/net.d
+        - name: kube-router-cfg
+          configMap:
+            defaultMode: 420
+            name: kube-router-cfg
+        - name: kubeconfig
+          hostPath:
+            path: /etc/kubernetes/kubeconfig
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1

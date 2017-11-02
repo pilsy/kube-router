@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}-cfg
+  namespace: kube-system
+  labels:
+    tier: node
+    k8s-app: kube-router
+    app: {{ include "name" . | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+data:
+{{ toYaml .Values.ConfigMap | indent 2 }}
